@@ -56,7 +56,7 @@ function fetch {
         nexturl=$(echo "$rawjson" | jq -r .links.next)
         nexturlparams=$(echo "$nexturl" | cut -d? -f2)
         assets=$(echo "$rawjson" | jq -r '.data.[].attributes | select(.eligible_for_submission==true) | select([.asset_type] | inside(["WILDCARD", "URL"])) | .asset_identifier')
-        echo "$assets"
+        if [[ -n "$assets" ]]; then echo "$assets"; fi
         first=$false
       done
 
