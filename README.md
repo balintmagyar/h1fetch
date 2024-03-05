@@ -1,5 +1,7 @@
 # h1fetch - Fetch data from HackerOne programs
 
+A Bash script to fetch data from HackerOne bug bounty and vulnerability disclosure programs. Useful for feeding the output into other tools.
+
 ## Requirements
 
 * `curl` and `jq`
