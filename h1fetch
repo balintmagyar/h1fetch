@@ -1,0 +1,97 @@
+#!/bin/bash
+
+# h1fetch v0.0
+# by Bálint Magyar
+# https://github.com/balintmagyar/h1fetch
+
+function usage {
+  echo "h1fetch - Fetch data from HackerOne programs"
+  echo "version 0.0"
+  echo
+  echo "Usage: h1fetch <resource> [argument]"
+  echo
+  echo "Resources:"
+  echo "  programs			# Fetch and print handles only of all programs with open submissions"
+  echo "  programjson <program handle>	# Fetch and pretty print entire JSON program record"
+  echo "  assets <program handle>	# Fetch and print all in-scope wildcard and URL program assets only"
+}
+
+function request {
+  cmd="curl -s 'https://api.hackerone.com/v1/hackers/${@}' -X GET -u '$H1USER:$H1TOKEN' -H 'Accept: application/json'"
+  echo $(eval "$cmd")
+}
+
+function fetch {
+  case "$1" in
+    programs)
+      rawjson=$(request "programs")
+      nexturl=$(echo "$rawjson" | jq -r .links.next)
+
+      while [[ "$nexturl" != "null" ]]; do
+        handles=$(echo "$rawjson" | jq -r .data.[].attributes.handle)
+        echo "$handles"
+        nexturlparams=$(echo "$nexturl" | cut -d? -f2)
+        rawjson=$(request "programs?${nexturlparams}")
+        nexturl=$(echo "$rawjson" | jq -r .links.next)
+      done
+
+      exit 0
+      ;;
+
+    programjson)
+      if [[ -z "$2" ]]; then
+        usage
+        exit 1
+      fi
+
+      request "programs/${2}" | jq
+      exit 0
+      ;;
+
+    assets)
+      first=$true
+
+      while [[ "$nexturl" != "null" || $first ]]; do
+        rawjson=$(request "programs/${2}/structured_scopes?${nexturlparams}")
+        nexturl=$(echo "$rawjson" | jq -r .links.next)
+        nexturlparams=$(echo "$nexturl" | cut -d? -f2)
+        assets=$(echo "$rawjson" | jq -r '.data.[].attributes | select(.eligible_for_submission==true) | select([.asset_type] | inside(["WILDCARD", "URL"])) | .asset_identifier')
+        echo "$assets"
+        first=$false
+      done
+
+      exit 0
+      ;;
+
+    *)
+      usage
+      exit 1
+      ;;
+  esac
+}
+
+# check dependencies
+missingdeps=""
+if [[ ! $(which curl) || ! $(which jq) ]]; then
+  usage
+  echo
+  echo "*** Make sure both curl and jq are installed"
+  exit 1
+fi
+
+# print help for API token vars
+if [[ -z "$H1USER" || -z "$H1TOKEN" ]]; then
+  usage
+  echo
+  echo '*** Get a HackerOne API token and make sure to set $H1USER and $H1TOKEN before running'
+  exit 1
+fi
+
+# handle commands
+if [[ -n "$1" ]]; then
+  fetch "$1" "$2"
+# otherwise print help
+else
+  usage
+  exit 1
+fi
